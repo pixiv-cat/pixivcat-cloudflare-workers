@@ -1,0 +1,14 @@
+{
+  "name": "pixivcat-cloudflare-workers",
+  "version": "1.0.0",
+  "description": "Pixiv.cat on Cloudflare Workers",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pixiv"
+  ],
+  "author": "jongcs",
+  "license": "MIT"
+}

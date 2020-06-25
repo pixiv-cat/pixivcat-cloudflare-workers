@@ -3,7 +3,7 @@ addEventListener('fetch', event => {
 })
 
 const credentials = {
-    refresh_token: 'Ph-2YeWnfl0ycjM1AsIW0_JtvVd2BBGfnWuGUS7Aqps',
+    refresh_token: '', // Put your refresh_token here.
     access_token: '',
     refresh_token_expiry: 0
 }

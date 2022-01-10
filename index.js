@@ -3,7 +3,7 @@ addEventListener('fetch', event => {
 })
 
 const credentials = {
-    refresh_token: '', // Put your refresh_token here.
+    refresh_token: REFRESH_TOKEN,
     access_token: '',
     refresh_token_expiry: 0
 }
@@ -39,7 +39,7 @@ function _parseFilenameFromUrl(url) {
 
 async function _getToken() {
     if (Date.now() > credentials.refresh_token_expiry) {
-        const url = new URL('https://oauth.secure.pixiv.net/auth/token');
+        const url = new URL(`https://${PIXIV_OAUTH_ENDPOINT}/auth/token`);
         let formData = new FormData();
         formData.append('grant_type', 'refresh_token');
         formData.append('refresh_token', credentials.refresh_token);
@@ -71,15 +71,21 @@ async function _callPixivApi(url, token) {
     const cacheKey = new Request(new URL(url), {
         method: "GET",
         headers: {
-            'Referer': 'http://spapi.pixiv.net',
-            'User-Agent': 'PixivIOSApp/5.6.0',
+            'App-Version': '7.6.2',
+            'App-OS-Version': '12.2',
+            'App-OS': 'ios',
+            'Accept': 'application/json',
+            'User-Agent': 'PixivIOSApp/7.6.2 (iOS 12.2; iPhone9,1)'
         }
     })
     const cacheKeyForRequest = new Request(new URL(url), {
         method: "GET",
         headers: {
-            'Referer': 'http://spapi.pixiv.net',
-            'User-Agent': 'PixivIOSApp/5.6.0',
+            'App-Version': '7.6.2',
+            'App-OS-Version': '12.2',
+            'App-OS': 'ios',
+            'Accept': 'application/json',
+            'User-Agent': 'PixivIOSApp/7.6.2 (iOS 12.2; iPhone9,1)',
             'Authorization': 'Bearer ' + token
         }
     })
@@ -90,6 +96,7 @@ async function _callPixivApi(url, token) {
         const res = await fetch(cacheKeyForRequest)
         cachedResponse = new Response(res.body, res)
         cachedResponse.headers.set('Cache-Control', 'max-age=3600');
+        cachedResponse.headers.delete('Set-Cookie');
         await cache.put(cacheKey, cachedResponse.clone())
     }
     return cachedResponse.json();
@@ -125,20 +132,20 @@ async function handleRequest(request) {
     } else if (checkRequest.is_manga === false) { // Normal mode
         const token = await _getToken();
         // Using reverse proxy because pixiv is blocking some IP from cloudflare/google cloud.
-        const pixivApi = await _callPixivApi(`https://public-api.secure.pixiv.net/v1/works/${checkRequest.pixiv_id}.json?image_sizes=large`, token);
+        const pixivApi = await _callPixivApi(`https://${PIXIV_API_ENDPOINT}/v1/illust/detail?illust_id=${checkRequest.pixiv_id}`, token);
 
-        if (pixivApi['status'] !== "success") return new Response('這個作品可能已被刪除，或無法取得。', {
+        if (pixivApi['error'] !== undefined) return new Response('這個作品可能已被刪除，或無法取得。', {
             status: 404
         }); // Not found
-        if (pixivApi['response'][0]['is_manga']) return new Response('這個作品ID中有' + pixivApi['response'][0]['page_count'] + '張圖片，需要指定頁數才能正確顯示。', {
+        if (pixivApi['illust']['page_count'] > 1) return new Response(`這個作品ID中有 ${pixivApi['illust']['page_count']} 張圖片，需要指定頁數才能正確顯示。`, {
             status: 404
         }); // This Pixiv ID is manga mode, must to specify which page.
 
-        let image = await _getImage(pixivApi['response'][0]['image_urls'].large);
+        let image = await _getImage(pixivApi['illust']['meta_single_page']['original_image_url']);
         image = new Response(image.body, image);
-        image.headers.set('X-Origin-URL', pixivApi['response'][0]['image_urls'].large);
+        image.headers.set('X-Origin-URL', pixivApi['illust']['meta_single_page']['original_image_url']);
         image.headers.set('X-Access-Token-TS', credentials.refresh_token_expiry);
-        image.headers.set('Content-Disposition', 'inline; filename="' + _parseFilenameFromUrl(pixivApi['response'][0]['image_urls'].large) + '"');
+        image.headers.set('Content-Disposition', 'inline; filename="' + _parseFilenameFromUrl(pixivApi['illust']['meta_single_page']['original_image_url']) + '"');
         image.headers.delete('Via');
         return image;
     } else if (checkRequest.is_manga === true) { // Manga mode
@@ -147,23 +154,23 @@ async function handleRequest(request) {
         }); // Specified page is 0.
 
         const token = await _getToken();
-        const pixivApi = await _callPixivApi(`https://public-api.secure.pixiv.net/v1/works/${checkRequest.pixiv_id}.json?image_sizes=large`, token);
+        const pixivApi = await _callPixivApi(`https://${PIXIV_API_ENDPOINT}/v1/illust/detail?illust_id=${checkRequest.pixiv_id}`, token);
 
-        if (pixivApi['status'] !== "success") return new Response('這個作品可能已被刪除，或無法取得。', {
+        if (pixivApi['error'] !== undefined) return new Response('這個作品可能已被刪除，或無法取得。', {
             status: 404
         }); // Not found
-        if (!pixivApi['response'][0]['is_manga']) return new Response('這個作品ID中有只有一張圖片，不需要指定是第幾張圖片。', {
+        if (pixivApi['illust']['page_count'] === 1) return new Response('這個作品ID中有只有一張圖片，不需要指定是第幾張圖片。', {
             status: 404
         }); // This Pixiv ID is Normal mode but the page is specified.
-        if (checkRequest.pixiv_page + 1 > pixivApi['response'][0]['page_count'] || checkRequest.pixiv_page < 0) return new Response('這個作品ID中有' + pixivApi['response'][0]['page_count'] + '張圖片，您指定的頁數已超過這個作品ID中的頁數。', {
+        if (checkRequest.pixiv_page + 1 > pixivApi['illust']['page_count'] || checkRequest.pixiv_page < 0) return new Response(`這個作品ID中有 ${pixivApi['illust']['page_count']} 張圖片，您指定的頁數已超過這個作品ID中的頁數。`, {
             status: 404
         }); // The specified page is more than total pages of this ID.
 
-        let image = await _getImage(pixivApi['response'][0]['metadata']['pages'][checkRequest.pixiv_page]['image_urls'].large);
+        let image = await _getImage(pixivApi['illust']['meta_pages'][checkRequest.pixiv_page]['image_urls']['original']);
         image = new Response(image.body, image);
-        image.headers.set('X-Origin-URL', pixivApi['response'][0]['metadata']['pages'][checkRequest.pixiv_page]['image_urls'].large);
+        image.headers.set('X-Origin-URL', pixivApi['illust']['meta_pages'][checkRequest.pixiv_page]['image_urls']['original']);
         image.headers.set('X-Access-Token-TS', credentials.refresh_token_expiry);
-        image.headers.set('Content-Disposition', 'inline; filename="' + _parseFilenameFromUrl(pixivApi['response'][0]['metadata']['pages'][checkRequest.pixiv_page]['image_urls'].large) + '"');
+        image.headers.set('Content-Disposition', 'inline; filename="' + _parseFilenameFromUrl(pixivApi['illust']['meta_pages'][checkRequest.pixiv_page]['image_urls']['original']) + '"');
         image.headers.delete('Via');
         return image;
     }

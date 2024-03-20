@@ -1,20 +1,25 @@
 # pixivcat-cloudflare-workers
+
 Pixiv.cat on Cloudflare Workers
 
 ## Setup
-1. (Optional)[Install wrangler](https://github.com/cloudflare/wrangler).
+
+1. (Optional)[Install wrangler](https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler).
 
 2. [Get your REFRESH_TOKEN](https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde).
 
 3. Set your `REFRESH_TOKEN` as encrypted environment variable in Cloudflare Workers.
-```
+
+```text
 wrangler secret put REFRESH_TOKEN
 ```
+
 Alternatively, you can set environment variables in "Settings" tab of your workers project.
 
 4. Update `PIXIV_API_ENDPOINT` and `PIXIV_OAUTH_ENDPOINT` variables in `wrangler.toml`.
 You will need to set up two reverse proxy on your own web server, here is an example for nginx:
-```
+
+```text
 server {
     listen 443 ssl;
 
@@ -45,16 +50,19 @@ server {
  }
 }
 ```
-Then edit the variables in `wrangler.toml`.
-```
+
+Then edit the variables and replace with your url in `wrangler.toml`.
+
+```text
 [vars]
 PIXIV_API_ENDPOINT = "app-api.example.com"
 PIXIV_OAUTH_ENDPOINT = "oauth.example.com"
 ```
 
 5. Upload the codes to Cloudflare Workers.
-```
-wrangler publish
+
+```text
+wrangler deploy
 ```
 
-Demo: https://demo.pixivcat.workers.dev/75034219.jpg
+Demo: <https://demo.pixivcat.workers.dev/75034219.jpg>

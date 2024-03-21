@@ -1,12 +1,14 @@
+# https://developers.cloudflare.com/workers/wrangler/configuration/
 name = "pixivcat-cloudflare-workers"
-type = "javascript"
-route = ''
-zone_id = ''
-usage_model = ''
+main = "index.js"
+compatibility_date = "2024-03-20"
+account_id = ""
 compatibility_flags = []
 workers_dev = true
-compatibility_date = "2022-01-10"
 
 [vars]
 PIXIV_API_ENDPOINT = "app-api.pixiv.net"
 PIXIV_OAUTH_ENDPOINT = "oauth.secure.pixiv.net"
+
+[placement]
+mode = "off"
